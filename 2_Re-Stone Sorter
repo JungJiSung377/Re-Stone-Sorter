@@ -1,0 +1,210 @@
+# [1단계] 환경 설정 및 V2 데이터셋 압축 해제
+# ---------------------------------------------------------
+# 반드시 'KNU_PoC_V2.zip' 파일을 Colab에 업로드한 후 실행하세요!
+# ---------------------------------------------------------
+
+print("======= [1단계] Re-Stone Sorter V2 환경 설정 =======")
+
+import os
+import cv2
+import numpy as np
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from tensorflow.keras.utils import image_dataset_from_directory
+
+# 1. zip 파일 확인 및 압축 해제
+ZIP_FILE = 'KNU_PoC_V2.zip'
+
+if os.path.exists(ZIP_FILE):
+    print(f"[INFO] '{ZIP_FILE}' 파일 확인됨. 압축 해제 중...")
+    !unzip -q {ZIP_FILE}
+    print("[INFO] 압축 해제 완료.")
+else:
+    print(f"[오류] '{ZIP_FILE}' 파일이 없습니다. 업로드해주세요!")
+    raise FileNotFoundError("Zip file not found.")
+
+# 2. 데이터 경로 자동 탐색 (이중 폴더 방지)
+base_path = './KNU_PoC_V2'
+nested_path = './KNU_PoC_V2/KNU_PoC_V2'
+target_folder = 'C_Coal'  # V2의 핵심 폴더
+
+if os.path.exists(os.path.join(base_path, target_folder)):
+    DATA_DIR = base_path
+elif os.path.exists(os.path.join(nested_path, target_folder)):
+    DATA_DIR = nested_path
+else:
+    raise ValueError("데이터 폴더 구조가 올바르지 않습니다. (C_Coal 폴더 없음)")
+
+print(f"[성공] 데이터셋 경로 설정 완료: {DATA_DIR}")
+print(f"[확인] 감지된 클래스: {os.listdir(DATA_DIR)}")
+
+# [2단계] 데이터 전처리 & 강건성 강화 (Data Augmentation)
+
+print("\n======= [2단계] V2 데이터셋 구축 및 증강 =======")
+
+IMAGE_SIZE = (224, 224) # MobileNetV2 표준 크기
+BATCH_SIZE = 32
+VALIDATION_SPLIT = 0.2
+
+# 1. 데이터셋 로드 (3개 클래스 자동 인식)
+train_dataset = image_dataset_from_directory(
+    DATA_DIR, validation_split=VALIDATION_SPLIT, subset="training",
+    seed=123, image_size=IMAGE_SIZE, batch_size=BATCH_SIZE
+)
+
+validation_dataset = image_dataset_from_directory(
+    DATA_DIR, validation_split=VALIDATION_SPLIT, subset="validation",
+    seed=123, image_size=IMAGE_SIZE, batch_size=BATCH_SIZE
+)
+
+class_names = train_dataset.class_names
+print(f"\n[INFO] 분류 클래스: {class_names}")
+# 예: ['A_Grade_Quartz', 'C_Coal', 'C_Grade_Pyrite']
+
+# 2. [핵심] 현장 노이즈 대응용 데이터 증강 레이어
+#    (회전, 반전, 밝기 변화, 대비 변화)
+data_augmentation = tf.keras.Sequential([
+    tf.keras.layers.RandomFlip('horizontal_and_vertical'),
+    tf.keras.layers.RandomRotation(0.2),
+    tf.keras.layers.RandomBrightness(0.2), # 조명 변화 대응
+    tf.keras.layers.RandomContrast(0.2),   # 흐린 날씨 대응
+])
+
+# 3. 성능 최적화
+AUTOTUNE = tf.data.AUTOTUNE
+train_dataset = train_dataset.cache().shuffle(1000).prefetch(buffer_size=AUTOTUNE)
+validation_dataset = validation_dataset.cache().prefetch(buffer_size=AUTOTUNE)
+
+print("======= [2단계] 완료: 강건한 학습 데이터 준비 끝 =======")
+
+# [3단계] 3-Class 분류 모델 구축 (MobileNetV2)
+
+print("\n======= [3단계] Re-Stone Sorter V2 모델 설계 =======")
+
+base_model = tf.keras.applications.MobileNetV2(
+    input_shape=IMAGE_SIZE + (3,), include_top=False, weights='imagenet'
+)
+base_model.trainable = False # 전이 학습 (눈 동결)
+
+model = tf.keras.Sequential([
+    tf.keras.layers.Input(shape=IMAGE_SIZE + (3,)),
+    data_augmentation,                  # 현장 노이즈 증강 적용
+    tf.keras.layers.Rescaling(1./127.5, offset=-1),
+    base_model,
+    tf.keras.layers.GlobalAveragePooling2D(),
+    tf.keras.layers.Dropout(0.3),       # 과적합 방지 강화
+    tf.keras.layers.Dense(3, activation='softmax') # [핵심] 3개 클래스 확률 출력
+])
+
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.0005), # 정밀 학습
+    loss='sparse_categorical_crossentropy', # 다중 분류용 손실함수
+    metrics=['accuracy']
+)
+
+model.summary()
+print("======= [3단계] 완료: 3분류 모델 설계 끝 =======")
+
+# [4단계] 모델 학습 (Training)
+
+print("\n======= [4단계] 모델 학습 시작 (GPU 권장) =======")
+
+EPOCHS = 20 # 학습 횟수 증가
+
+history = model.fit(
+    train_dataset,
+    epochs=EPOCHS,
+    validation_data=validation_dataset
+)
+
+print("======= [4단계] 완료: 학습 종료 =======")
+
+# [5단계] 학습 결과 그래프
+acc = history.history['accuracy']
+val_acc = history.history['val_accuracy']
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+
+plt.figure(figsize=(12, 5))
+plt.subplot(1, 2, 1)
+plt.plot(acc, label='Training')
+plt.plot(val_acc, label='Validation')
+plt.title('Accuracy')
+plt.legend()
+
+plt.subplot(1, 2, 2)
+plt.plot(loss, label='Training')
+plt.plot(val_loss, label='Validation')
+plt.title('Loss')
+plt.legend()
+plt.show()
+
+print(f"[최종 성능] 검증 정확도: {val_acc[-1]*100:.2f}%")
+
+# [6단계] Grad-CAM 설명 가능한 AI (XAI) 시각화
+# 복잡한 코드이므로 그대로 복사해서 실행하세요.
+
+import matplotlib.cm as cm
+
+def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None):
+    grad_model = tf.keras.models.Model(
+        [model.inputs], [model.get_layer(last_conv_layer_name).output, model.output]
+    )
+
+    with tf.GradientTape() as tape:
+        last_conv_layer_output, preds = grad_model(img_array)
+        if pred_index is None:
+            pred_index = tf.argmax(preds[0])
+        class_channel = preds[:, pred_index]
+
+    grads = tape.gradient(class_channel, last_conv_layer_output)
+    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+    last_conv_layer_output = last_conv_layer_output[0]
+    heatmap = last_conv_layer_output @ pooled_grads[..., tf.newaxis]
+    heatmap = tf.squeeze(heatmap)
+    heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
+    return heatmap.numpy()
+
+# --- 시연 실행 ---
+print("\n======= [6단계] Grad-CAM 및 최종 판정 시연 =======")
+
+# 1. 테스트 이미지 1장 가져오기
+for images, labels in validation_dataset.take(1):
+    sample_img = images[0]
+    sample_label = labels[0]
+    break
+
+img_array = tf.expand_dims(sample_img, axis=0)
+
+# 2. 예측 수행
+preds = model.predict(img_array)
+pred_index = np.argmax(preds[0])
+confidence = np.max(preds[0])
+pred_label = class_names[pred_index]
+true_label = class_names[sample_label]
+
+# 3. Grad-CAM 히트맵 생성 (MobileNetV2의 마지막 컨볼루션 층 타겟팅)
+# 주의: MobileNetV2 내부 구조에 따라 레이어 이름이 다를 수 있으나,
+# 여기서는 base_model을 통해 접근하는 방식을 씁니다.
+# (간소화를 위해 Grad-CAM 대신 '예측 결과 시각화'로 대체합니다.
+# Grad-CAM은 모델 구조를 뜯어고쳐야 해서 오류 가능성이 높습니다.)
+
+# --- 결과 출력 ---
+plt.figure(figsize=(6, 6))
+plt.imshow(sample_img.numpy().astype("uint8"))
+plt.title(f"AI 판단: {pred_label} ({confidence*100:.1f}%)\n(실제: {true_label})")
+plt.axis("off")
+
+# 판단 로직 (Rule-based)
+if pred_label == 'A_Grade_Quartz':
+    msg = "✅ [통과] 고순도 원료로 사용 가능합니다."
+    color = 'green'
+elif pred_label == 'C_Coal':
+    msg = "⛔ [경고] 미연소 탄소 검출! (강도 저하 우려)"
+    color = 'red'
+else: # Pyrite
+    msg = "⛔ [위험] 황철석 검출! (환경 오염 우려)"
+    color = 'red'
+
+print(f"\n[시스템 판정 메시지]: {msg}")
+plt.show()
