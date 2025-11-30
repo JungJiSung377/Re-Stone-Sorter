@@ -10,7 +10,7 @@
 
 ### 1. 모델 구현 및 검증 데이터
 
-![데이터셋 확보 image]([https://github.com/JungJiSung377/-ACK2025_Mineral_distribution_prediction/blob/main/image2.png](https://github.com/JungJiSung377/Re-Stone-Sorter/blob/main/image.png))
+![모델 구현 이미](https://github.com/JungJiSung377/Re-Stone-Sorter/blob/main/image.png)
 
   * 출처
 1. 이계승, 전효택. (2010). 태백산 광화대 선탄경석의 광물학적 및 화학적 특성. 한국자원공학회지, 47(4), 481-492.
