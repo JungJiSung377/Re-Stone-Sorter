@@ -13,10 +13,10 @@
 ![데이터셋 확보 image]([https://github.com/JungJiSung377/-ACK2025_Mineral_distribution_prediction/blob/main/image2.png](https://github.com/JungJiSung377/Re-Stone-Sorter/blob/main/image.png))
 
   * 출처
-  * 1. 이계승, 전효택. (2010). 태백산 광화대 선탄경석의 광물학적 및 화학적 특성. 한국자원공학회지, 47(4), 481-492.
-    2. 국가기술표준원. (2022). KS F 2527:2022 콘크리트용 골재.
-    3. 강원테크노파크. (2023). 석탄 경석 규제개선 및 자원화 방안 보고서.
-    4. 환경부. (2012). 2011년 폐석탄광산 기초환경조사 결과. / Jocher, G. et al. (2023). Ultralytics YOLOv8.
+1. 이계승, 전효택. (2010). 태백산 광화대 선탄경석의 광물학적 및 화학적 특성. 한국자원공학회지, 47(4), 481-492.
+2. 국가기술표준원. (2022). KS F 2527:2022 콘크리트용 골재.
+3. 강원테크노파크. (2023). 석탄 경석 규제개선 및 자원화 방안 보고서.
+4. 환경부. (2012). 2011년 폐석탄광산 기초환경조사 결과. / Jocher, G. et al. (2023). Ultralytics YOLOv8.
 
 
 
