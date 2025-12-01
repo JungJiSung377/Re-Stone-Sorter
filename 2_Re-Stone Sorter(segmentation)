@@ -1,0 +1,94 @@
+# [Cell 1] 라이브러리 설치 및 데이터 다운로드
+# ---------------------------------------------------------
+print("🚀 고화질 세그멘테이션 환경을 설정합니다...")
+
+# 라이브러리 설치
+!pip install -q ultralytics roboflow
+
+from ultralytics import YOLO
+from roboflow import Roboflow
+import torch
+
+# GPU 사용 가능 여부 확인 (이게 True여야 영상이 안 끊깁니다)
+print(f"🔥 GPU 사용 가능 여부: {torch.cuda.is_available()}")
+
+# ==============================================================================
+# [▼ 중요 ▼] Roboflow에서 복사한 코드를 아래에 붙여넣으세요!
+# ==============================================================================
+
+!pip install roboflow
+
+from roboflow import Roboflow
+rf = Roboflow(api_key="pCSRrjHo42IhQcJNn7j5")
+project = rf.workspace("jusung-qadot").project("re-stone-seg-v3-iz4wh")
+version = project.version(2)
+dataset = version.download("yolov8")
+
+# [Cell 2] YOLOv8 세그멘테이션 모델 정밀 학습
+# ---------------------------------------------------------
+print("🧠 AI 정밀 학습을 시작합니다... (약 15~20분 소요)")
+
+# 1. 모델 로드 (가벼우면서도 성능 좋은 'nano' 모델 사용)
+# 만약 성능을 더 높이고 싶다면 'yolov8s-seg.pt'로 바꿔보세요 (속도는 약간 느려짐)
+model = YOLO('yolov8n-seg.pt')
+
+# 2. 학습 시작 (옵션 강화)
+model.train(
+    data=f"{dataset.location}/data.yaml",
+    epochs=100,       # 학습 횟수 2배 증가 (더 자세히 배우기 위해)
+    patience=10,      # 성능이 안 오르면 10번 기다리다 조기 종료 (시간 절약)
+    imgsz=640,        # 이미지 크기
+    batch=16,         # 안정적인 학습을 위한 배치 사이즈
+    plots=True
+)
+
+print("✅ 정밀 학습 완료! 모델이 준비되었습니다.")
+
+# [Cell 3] (수정됨) 시연 영상 업그레이드 코드
+# ---------------------------------------------------------
+import os
+import glob
+
+print("🎬 영상 처리를 다시 시작합니다 (설정 업그레이드)...")
+
+VIDEO_NAME = "test_video.mp4"
+
+if not os.path.exists(VIDEO_NAME):
+    print(f"❌ 오류: '{VIDEO_NAME}' 파일을 찾을 수 없습니다.")
+else:
+    # 추론 및 영상 저장
+    results = model.predict(
+        source=VIDEO_NAME,
+        save=True,
+
+        # ★★★ [시각화 업그레이드 설정] ★★★
+        retina_masks=True,  # 고해상도 마스크 (경계선 깔끔하게)
+        show_boxes=False,   # 네모 박스는 끄기 (모양만 집중)
+
+        show_labels=True,   # [중요] 이름표(Quartz/Pyrite) 표시 켜기!
+        show_conf=True,     # [중요] 확률(%) 표시 켜기!
+
+        line_width=2,       # 선 두께를 키워야 글씨도 커집니다! (1 -> 2 or 3)
+        opacity=0.3,        # 색칠 투명도 (0.0~1.0). 낮을수록 투명해짐. (0.3 추천)
+
+        conf=0.4,           # 확신도 40% 이상인 것만 표시
+        iou=0.5,            # 겹친 것 제거
+        stream=True
+    )
+
+    for r in results: pass
+
+    print("\n✅ 영상 생성 완료!")
+
+    # 저장된 파일 찾기
+    predict_dirs = sorted(glob.glob('runs/segment/predict*'), key=os.path.getmtime)
+    if predict_dirs:
+        latest_dir = predict_dirs[-1]
+        video_files = glob.glob(f'{latest_dir}/*.avi') + glob.glob(f'{latest_dir}/*.mp4')
+        if video_files:
+            print(f"\n📂 [결과물]: {video_files[0]}")
+            print(f"👉 다운로드해서 확인해보세요!")
+        else:
+            print("⚠️ 영상 파일 생성 실패.")
+    else:
+        print("⚠️ runs 폴더 없음.")
