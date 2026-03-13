@@ -65,7 +65,6 @@
 ## 🧑‍💻 Contributors
 * **정지성 (Jisung Jung)** - 에너지자원공학과 (AI 모델 설계 및 데이터 분석)
 * **설재훈 (Jaehoon Seol)** - 메카트로닉스공학과 (하드웨어 제어 및 시스템 통합)
-* **Affiliation:** 강원대학교 융합소프트웨어랩 (Convergence Software Lab)
 
 
 ### 모델 구현 및 검증 데이터
